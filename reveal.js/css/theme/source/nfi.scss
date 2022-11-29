@@ -1,0 +1,65 @@
+/**
+ * White theme for reveal.js. This is the opposite of the 'black' theme.
+ *
+ * By Hakim El Hattab, http://hakim.se
+ */
+
+
+// Default mixins and settings -----------------
+@import "../template/mixins";
+@import "../template/settings";
+// ---------------------------------------------
+
+
+// Include theme-specific fonts
+@import url(./fonts/rijksoverheid/rijksoverheid-fonts.css);
+
+.reveal {
+    background: linear-gradient(to bottom, #8fcae7 0%, #8fcae7 10%,#ffffff 10%,#ffffff 92%,#ffffff 92%,#8fcae7 92%,#8fcae7 100%);
+
+    .rijksoverheid-ribbon {
+        margin: 0;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        width: 10%;
+        max-height: 15%;
+    }
+
+    .nfi-woordlogo {
+        margin-top: -8vh;
+        margin-left: 55vw;
+        position: absolute;
+        height: 6%;
+    }
+}
+
+// Override theme settings (see ../template/settings.scss)
+$backgroundColor: #8fcae7;
+
+$mainColor: #222;
+$headingColor: #222;
+
+$mainFontSize: 30px;
+$mainFont: 'Rijksoverheid Serif Web Regular', serif;
+$headingFont: 'Rijksoverheid Serif Web Regular', serif;
+$headingTextShadow: none;
+$headingLetterSpacing: normal;
+$headingTextTransform: none;
+$headingFontWeight: 600;
+$linkColor: #2a76dd;
+$linkColorHover: lighten( $linkColor, 15% );
+$selectionBackgroundColor: lighten( $linkColor, 25% );
+
+$heading1Size: 1em;
+$heading2Size: 1.6em;
+$heading3Size: 1.3em;
+$heading4Size: 1.0em;
+
+// Change text colors against dark slide backgrounds
+@include dark-bg-text-color(#fff);
+
+
+// Theme template ------------------------------
+@import "../template/theme";
+// ---------------------------------------------

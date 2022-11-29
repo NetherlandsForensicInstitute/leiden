@@ -1,0 +1,492 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hansken Hackathon Hogeschool Leiden</title>
+    <link rel="stylesheet" href="./reveal.js/dist/reset.css">
+    <link rel="stylesheet" href="./reveal.js/dist/reveal.css">
+    <link rel="stylesheet" href="./reveal.js/dist/theme/nfi.css">
+    <link rel="stylesheet" href="./reveal.js/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+    <img class="rijksoverheid-ribbon" src="./reveal.js/examples/assets/Logo_rijksoverheid.svg">
+    <img class="nfi-woordlogo" src="./reveal.js/examples/assets/nfi-woordlogo.svg">
+    <div class="slides">
+        <section>
+            <h1>Hansken hackathon</h1>
+            <p>Hogeschool Leiden</p>
+            <p>29th November 2022</p>
+        </section>
+        <section>
+            <h1>Three parts</h1>
+            <ul>
+                <li>Part 1: hansken.py</li>
+                <li>Part 2: Extraction plugins</li>
+                <li>Part 3: Artificial Intelligence with Hansken</li>
+            </ul>
+        </section>
+        <section>
+            <section><h2>What is Hansken?</h2>
+                <ul>
+                    <li>Forensic search engine</li>
+                    <li>But also a community that produces scripts, plugins and analyses</li>
+                </ul>
+            </section>
+            <section>
+                <h2>Very quick recap</h2>
+                <p>Project - images</p>
+                <p>1 - N</p>
+                <p>A Hansken <i>project</i> typically is a case, and can contain multiple <i>images</i> (usually phones,
+                    PCs, but also
+                    zips are possible).</p>
+                <p>Each image is a tree of
+                    <underline>traces</underline>
+                    , where each trace can have child traces. The root trace is the image.
+                </p>
+            </section>
+        </section>
+        <section>
+            <section><h2>Part 1: hansken.py</h2>
+                <p>hansken.py is the Python API that uses the REST API</p>
+                <pre data-id="code"><code class="hljs bash" data-trim>pip install hansken</code></pre>
+                <br>
+                <h3>Use cases:</h3>
+                <ul>
+                    <li>Searching for traces</li>
+                    <li>Exporting traces</li>
+                    <li>Enriching traces</li>
+                    <li>Hansken operations</li>
+                </ul>
+            </section>
+            <section>
+                <h2>Searching with hansken.py</h2>
+                <h3><code>ProjectContext(...).search</code></h3>
+                <pre data-id="code"><code class="hljs python" data-trim data-line-numbers>
+from hansken.connect import connect_project
+
+context = connect_project(
+    endpoint='https://gatekeeper01.test.hansken.holmes.nl/gatekeeper/',
+    keystore='https://keystore01.test.hansken.holmes.nl/keystore/',
+    project='411cefbf-f995-416f-9eb2-3cd2f378ca74')
+
+results = context.search('chatMessage.message:bomb', count=10)
+for trace in results:
+    ...  # do something with the traces
+                </code></pre>
+            </section>
+            <section>
+                <h2>Seraching with hansken.py</h2>
+                <h3>Trace model</h3>
+                <p>All types of metadata fields that can be created, and their types</p>
+                <p>Under Documentation in the technical UI
+                <p>If you want to do something with adding machine learning models, check out the <code>prediction</code> type</p>
+            </section>
+            <section>
+                <h2>Searching with hansken.py</h2>
+                <h3>.unique_values</h3>
+                <p>Aggregating and counting</p>
+                <pre data-id="code"><code class="hljs python" data-trim data-line-numbers>
+...  # see the previous slide on how the context object is created
+results = context.unique_values('chatMessage.application',
+                                query='chatMessage.message:bomb')
+for result in results:
+    print(result)
+# {'value': 'native messages', 'count': 7}
+# {'value': 'telegram', 'count': 524}
+# {'value': 'whatsapp', 'count' 4489}
+                </code></pre>
+            </section>
+            <section>
+            <pre data-id="code"><code class="hljs nohighlight" data-trim>➜  ~ python3 -m hansken --help
+usage: hansken [-h] [--version] COMMAND ...
+
+positional arguments:
+  COMMAND
+    backup    start backup of a project
+    extract   start extraction of images linked to a project
+    grant     grant keys for specific or project images to target identity or
+              identities
+    mount     mount images linked to a project as files inside an empty
+              directory
+    quickstart
+              interactively determine configuration values for use with
+              hansken.py
+    shell     spawn an interactive python shell
+    stats     generate statistical information for each image linked to a
+              project
+    tasks     list either open or closed tasks tracked by the Hansken
+              scheduler
+    tools     print a table of available extraction tools
+    upload    upload an image to Hansken image store
+    versions  print client, server and extraction versions
+
+optional arguments:
+  -h, --help  show this help message and exit
+  --version   show program's version number and exit
+            </code></pre>
+
+            </section>
+            <section>
+                FUSE mount of a Hansken image
+            </section>
+            <section>
+                <pre data-id="code"><code class="hljs python" data-trim data-line-numbers>
+from hansken.recipes import report
+from hansken.connect import connect_project
+
+context = connect_project(endpoint='http://localhost:9091/gatekeeper/',
+                          project='059c83a1-a38b-4144-a661-4a26fa588071',
+                          keystore='http://localhost:9090/keystore/')
+emails = context.search('type:email')
+for email in emails:
+    report.to_pdf('test.pdf', report.render_template('hansken/base.html', title="Test"))
+                </code></pre>
+                <p>See the hansken.py docs on how to generate exports or printable reports using these methods</p>
+            </section>
+            <section>
+                <h2>Enriching traces</h2>
+                <pre data-id="code"><code class="hljs python" data-trim data-line-numbers>
+... # Updating the trace itself
+trace.update('chatMessage.application', 'Telegram')
+trace.update({'chatMessage.message': 'Hi',
+              'chatMessage.application': 'Telegram'})
+... # Adding a child trace with properties
+child_trace = trace.child_builder('Name of the child trace')
+child_trace.update('picture.width', 100)
+child_trace.build()
+...
+                </code></pre>
+            </section>
+            <section>
+                <h2>Operations (singlefile image etc.)</h2>
+                <pre data-id="code"><code class="hljs python" data-trim data-line-numbers>
+...
+connection = context.connection  # there are other ways to get a Hansken Connection, see docs
+connection.upload_singlefile(data, name)
+connection.extract_singlefile(singlefile_id)
+connection.upload_image(image_id, data)
+connection.link_image(project_id, image_id)
+connection.extract(project_id, image_id, tools=...)
+...
+                </code></pre>
+
+            </section>
+        </section>
+        <section>
+            <section>
+                <h2>Part 2: Extraction plugins</h2>
+                <p>Extraction plugins run during the Hansken extraction,</p>
+                <p>define a "matcher", the types of traces they can process</p>
+                <p>Can produce data streams, metadata fields and child traces</p>
+            </section>
+            <section>
+                <p>API is very similar to hansken.py</p>
+                <p>Runs at extraction time</p>
+                <p>Communicates over gRPC (instead of REST like hansken.py)</p>
+            </section>
+            <section>
+                <h2><code>matcher</code></h2>
+                <p>A HQL (Hansken Query Language) query</p>
+                <p>
+                    But..., HQL Light, which means that not everything you try in Hansken's search bar also works here
+                </p>
+            </section>
+            <section>
+                                <pre data-id="code"><code class="hljs python" data-trim data-line-numbers>
+class BERTEmbeddings(MetaExtractionPlugin):
+
+    def plugin_info(self):
+        plugin_info = PluginInfo(
+            id=PluginId(domain='nfi.nl', category='media', name='BERT'),
+            version='2022.8.30',
+            description='BERT embeddings for chatmessages',
+            author=Author('Isadora Ellis', 'i.ellis@nfi.nl', 'NFI'),
+            maturity=MaturityLevel.PROOF_OF_CONCEPT,
+            webpage_url='https://github.com/netherlandsforensicinstitute/bert-embeddings',
+            matcher='type=chatMessage',  # <-- this is where you put the matcher
+            license="Apache License 2.0",
+            resources=PluginResources(maximum_cpu=1, maximum_memory=12000),
+        )
+        return plugin_info
+                                </code></pre>
+            </section>
+            <section>
+                <h3>Three types of extraction plugins:</h3>
+                <ul>
+                    <li><code>ExtractionPlugin</code>: Processes data and metadata</li>
+                    <li><code>MetaExtractionPlugin</code>: Processes metadata only</li>
+                    <li><code>DeferredExtractionPlugin</code>: Runs as late as possible, uses data and metadata and can
+                        search for more traces
+                    </li>
+                </ul>
+            </section>
+            <section>
+                <h2><code>ExtractionPlugin</code></h2>
+                <pre data-id="code"><code class="hljs python" data-trim data-line-numbers>
+def process(self, trace, data_context):
+    data = trace.open().read(data_context.data_size)
+                </code></pre>
+                <p>In this type of plugin both the trace, and a "data context" are available</p>
+                <p>The <code>process</code> method is invoked for each trace that matches</p>
+            </section>
+            <section>
+                <h2><code>MetaExtractionPlugin</code></h2>
+                <pre data-id="code"><code class="hljs python" data-trim data-line-numbers>
+def process(self, trace):
+    chatmessage = trace.get('chatMessage.message', None)
+    if chatmessage:
+        embedding = model.encode(chatmessage, batch_size=1)
+        log.info(str(embedding))
+        trace.add_tracelet(to_tracelet(embedding))
+                </code></pre>
+                <p>In this type of plugin just the trace object is present, and it can't access any data streams, just
+                    metadata</p>
+            </section>
+            <section>
+                <h2><code>DeferredExtractionPlugin</code></h2>
+                <pre data-id="code"><code class="hljs python" data-trim data-line-numbers>
+def process(self, trace, data_context, searcher):
+    passwords = searcher.search('account.password')
+    for password in passwords:
+        # for this example we assume some kind of decryptor
+        decryptor.decrypt(trace.open().read(), password)
+                </code></pre>    <!--  TODO find out exact syntax -->
+                <p>In this type of plugin an additional searcher object is present. This can be used to find other
+                    traces and access their attributes.</p>
+                <p>Example: decrypting files by trying all passwords in the case</p>
+            </section>
+            <section>
+                <h2>Hansken SDK</h2>
+                <p>Virtualbox with:</p>
+                <ul>
+                    <li>Hansken all-in-one</li>
+                    <li>IDE's for plugin development</li>
+                    <li>The Python package <code>hansken_extraction_plugin</code></li>
+                    <li>Docker for building the plugins</li>
+                </ul>
+                <p>
+                    <code>https://repo.hansken.org/repository/raw-community-releases/hansken-sdk/Hansken_SDK_1.0_rc1.ova</code>
+                </p>
+            </section>
+            <section>
+                <p>Build a plugin container image using the following command (on your VM):</p>
+                <pre data-id="code"><code class="hljs bash" data-trim>
+build_plugin PLUGIN_FILE DOCKER_FILE_DIRECTORY [DOCKER_IMAGE_NAME] [DOCKER_ARGS]
+                                </code></pre>
+
+                <p>For example:</p>
+                <pre data-id="code"><code class="hljs bash" data-trim>
+# from the folder ~/extraction-plugin-examples/python/chat
+cd ~/extraction-plugin-examples/python/chat
+build_plugin plugin/chat_plugin.py . chatplugin_yourname
+                                </code></pre>
+                <pre data-id="code"><code class="hljs bash" data-trim>
+# to see if it appears in the list
+docker image ls
+                                </code></pre>
+                <a href="https://netherlandsforensicinstitute.github.io/hansken-extraction-plugin-sdk-documentation/latest/">https://netherlandsforensicinstitute.github.io/hansken-extraction-plugin-sdk-documentation/latest/</a>
+
+
+            </section>
+            <section>
+                <p>Debugging a plugin can be done with hansken.py</p>
+                <p>Add this as your plugin's main to simulate how it runs</p>
+                <pre data-id="code"><code class="hljs python" data-trim>
+# replace BertEmbeddings with your plugin class name and replace the project ID
+if __name__ == "__main__":
+   run_with_hanskenpy(BERTEmbeddings,
+                      endpoint='http://localhost:9091/gatekeeper/',
+                      keystore='http://localhost:9090/keystore/',
+                      project='326c693c-45bc-4648-b8e3-24abb4f43c1d')
+                </code></pre>
+            </section>
+            <section><h1>Example plugin: RDP Bitmap Cache</h1>
+                <ul>
+                    <li>Windows has a cache for the built-in RDP client</li>
+                    <li>This contains tiles of mostly 64x64 pixels</li>
+                    <li><code>Cache0000.bin</code> (increasing numbers)</li>
+                </ul>
+            </section>
+            <section><h1>Step 1: Running an extraction plugin</h1>
+                <p>First we recover the bitmaps using an extraction plugin:</p>
+                <p><a href="https://git.eminjenv.nl/hanskaton/extraction-plugins/rdp-cache-reconstruction/">git.eminjenv.nl/hanskaton/extraction-plugins/rdp-cache-reconstruction</a>
+                </p>
+                <pre data-id="code"><code class="hljs python" data-trim data-line-numbers>
+def process(self, trace, data_context):
+	"""
+	Get tiles from the RDP cache on Windows machines.
+
+	:param trace: expected to be an RDP cache file
+	:param data_context: data_context
+	"""
+	log.info(f"processing trace {trace.get('name')}")
+	...  # calling the bmc_tools library to process this cache
+    # from our temporary folder
+	for tile_bmp in glob(f'{output_directory.name}/*.bmp'):
+		child_trace = trace.child_builder(name=os.path.basename(tile_bmp))
+		with open(tile_bmp, 'rb') as tile:
+			child_trace.update(data={'raw': tile.read()})
+		child_trace.build()
+</code></pre>
+            </section>
+            <section><h1>Step 2: Reconstructing screenshots in a notebook</h1>
+                <img height="400vh" src="assets/rdp-plugin.png"></section>
+            <section><img src="assets/rdp-notebook.png"></section>
+        </section>
+        <section>
+            <section>
+                <h2>Part 3: Artificial Intelligence with Hansken</h2>
+                <ul>
+                    <li>Well established AI (or data science)
+                        <ul>
+                            <li>FIRE: Forensic Image Recognition Engine <code>imaging/classification/fire</code></li>
+                            <li>FEEL: Forensic Entity Extraction Library <code>entity/feel</code></li>
+                        </ul>
+                    </li>
+                    <li>Upcoming and experimental AI that have been turned into plugins
+                        <ul>
+                            <li>CLIP: Model that maps text and images into the same vector space</li>
+                            <li>Sentence transformers: Representation of text as vectors</li>
+                        </ul>
+                    </li>
+                </ul>
+            </section>
+            <section><h2>FIRE: Forensic Image Recognition Engine</h2>
+                <p>Image recognition for about 20 relevant forensic classes, like money, drugs, firearm and military
+                    vehicle</p>
+                <p>But also, face recognition, video, scene text</p></section>
+            <section>
+                <h1>FEEL</h1>
+                <p>Extracts structured entities</p>
+                <p>think creditcard numbers, ZIP codes, digital currency addresses and keys</p>
+            </section>
+            <section>
+                <h1>CLIP vectors</h1>
+                <ul>
+                    <li>Developed by OpenAI</li>
+                    <li>Text and pictures in the same vector space</li>
+                    <li>Allows searching pictures with free form text</li>
+                    <li>Image recognition, without predefined classes</li>
+                    <li>"a picture of a cat and a dog"</li>
+                    <li>"a picture of someone pointing a gun"</li>
+                </ul>
+            </section>
+            <section>
+                <img height="800px" src="assets/adviesdocument.png">
+            </section>
+            <section>
+                <h1>Previous work</h1>
+                <p>Research into CLIP's performance: <a href="https://git.eminjenv.nl/nfi/imagesearch">git.eminjenv.nl/nfi/imagesearch</a>
+                </p>
+                <p>Developed as an extraction plugin: <a
+                        href="https://git.eminjenv.nl/hanskaton/extraction-plugins/clip-vectors">git.eminjenv.nl/hanskaton/extraction-plugins/clip-vectors</a>
+                </p>
+            </section>
+            <section>
+                <h2>Running the extraction plugin:</h2>
+                <img src="assets/clip-0.png">
+            </section>
+            <section>
+                <video src="assets/clip1.webm" autoplay loop></video>
+            </section>
+            <section>
+                <video src="assets/clip2.webm" autoplay loop></video>
+            </section>
+            <section>
+                <video src="assets/clip3.webm" autoplay loop></video>
+            </section>
+            <section>
+                <h2>Whisper</h2>
+                <p>New automatic speech recognition (ASR) model, also developed by OpenAI</p>
+                <p>NFI is currently evaluating this model, and developing an extraction plugin</p>
+            </section>
+            <section>
+                <h2>Sentence transformers</h2>
+                <p>Results in vectors that represent the meaning of a sentence</p>
+                <p>Can be used to achieve "semantic search"</p>
+                <p>Searching for "Merlot" also finds other wines, drinks and other things that are semantically
+                    similar</p>
+            </section>
+            <section>
+                <video src="assets/bert1.webm" autoplay loop></video>
+            </section>
+            <section>
+                <video src="assets/bert2.webm" autoplay loop></video>
+            </section>
+            <section>
+                <video src="assets/bert3.webm" autoplay loop></video>
+            </section>
+        </section>
+        <section>
+            <h1>Show me the code!</h1>
+            <ul>
+                <li><a href="https://git.eminjenv.nl/hanskaton/extraction-plugins/">git.eminjenv.nl/hanskaton/extraction-plugins/</a>
+                </li>
+                <li>
+                    <a href="https://github.com/netherlandsforensicinstitute/">github.com/netherlandsforensicinstitute/</a>
+                </li>
+            </ul>
+            <h1>Register at</h1>
+            <p>git.eminjenv.nl</p>
+            <p>with your work email address</p>
+            <h1>If you add your plugin to Github</h1>
+            <p>Tag it with <code>hansken</code> if you want to share it with all the Hansken partners</p>
+        </section>
+        <section>
+            <h1>Ideas?</h1>
+            <p>Pitch them!</p>
+        </section>
+        <section>
+            <h2>Checklist</h2>
+            <ul>
+                <li>Getting the SDK Virtualbox image running</li>
+                <li>Building the skeleton plugin (or an existing plugin)</li>
+                <li>Optionally, registering at git.eminjenv.nl for more examples</li>
+            </ul>
+        </section>
+        <section>
+            <h2>Exercise for building a simple plugin</h2>
+            <p>Step 1: Upload a zip with pictures in the Singlefile dialog</p>
+            <p>Step 2: Match picture traces in an extraction plugin</p>
+            <p>Step 3: Populate the <code>picture.misc.resolution</code> field with the outcome of <code>picture.width *
+                picture.height</code></p>
+            <p>Step 4: See if it ends up in the case</p>
+        </section>
+        <section>
+            <h2>As a second exercise</h2>
+            <p>See if you can add something as a datastream</p>
+            <p>You might need the documentation again</p>
+            <a href="https://netherlandsforensicinstitute.github.io/hansken-extraction-plugin-sdk-documentation/latest/">https://netherlandsforensicinstitute.github.io/hansken-extraction-plugin-sdk-documentation/latest/</a>
+
+        </section>
+        <section>
+            <h1>Questions?</h1>
+            <ul>
+                <li>Ask them now!</li>
+                <li>For later questions</li>
+                <ul>
+                    <li>Send an email to Hansken Support <a href="mailto:hansken-support@nfi.nl">&lt;hansken-support@nfi.nl&gt;</a>
+                    </li>
+                    <li>Join the Hansken Community Platform: <a href="https://communityportal.hansken.org">communityportal.hansken.org</a>
+                    </li>
+                    <li>Join the Hansken Discord: <a href="https://discord.gg/3eMa5MY7kf">discord.gg/3eMa5MY7kf</a></li>
+                </ul>
+            </ul>
+        </section>
+    </div>
+</div>
+
+<script src="./reveal.js/dist/reveal.js"></script>
+<script src="./reveal.js/plugin/notes/notes.js"></script>
+<script src="./reveal.js/plugin/markdown/markdown.js"></script>
+<script src="./reveal.js/plugin/highlight/highlight.js"></script>
+<script>
+    Reveal.initialize({
+        hash: true,
+        plugins: [RevealMarkdown, RevealHighlight, RevealNotes]
+    });
+</script>
+</body>
+</html>
